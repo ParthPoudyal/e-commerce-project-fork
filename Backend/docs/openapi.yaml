@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: Auction Studio API
+  version: 1.0.0
+  description: High-performance Go backend for Auction Studio online auction and marketplace for antiques and collectibles.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string }
+                phone: { type: string }
+                location: { type: string }
+      responses:
+        201:
+          description: User registered successfully
+
+  /auth/login:
+    post:
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        200:
+          description: Authentication tokens
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: User profile
+
+  /categories:
+    get:
+      summary: Get hierarchical category tree
+      responses:
+        200:
+          description: List of category nodes
+
+  /items:
+    get:
+      summary: List items with filtering, search, sorting and pagination
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: subcategory
+          in: query
+          schema: { type: string }
+        - name: purchaseMode
+          in: query
+          schema: { type: string, enum: [auction, buy-now] }
+        - name: condition
+          in: query
+          schema: { type: string }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: priceMin
+          in: query
+          schema: { type: integer }
+        - name: priceMax
+          in: query
+          schema: { type: integer }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [ending-soon, price-asc, price-desc, bids, newest] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 12 }
+      responses:
+        200:
+          description: Paginated items
+
+    post:
+      summary: Create an item (seller/admin only)
+      security:
+        - BearerAuth: []
+      responses:
+        201:
+          description: Item created
+
+  /items/{id}:
+    get:
+      summary: Get item details by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Item details
+
+  /items/{id}/bids:
+    get:
+      summary: Get bid history for an item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: List of bids
+
+    post:
+      summary: Place a bid on an auction item (concurrently locked)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: integer, description: Amount in NPR }
+      responses:
+        200:
+          description: Bid placed successfully
+
+  /bids/{id}:
+    delete:
+      summary: Cancel a bid (soft deletes and recalculates highest bid)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Bid cancelled
+
+  /cart:
+    get:
+      summary: Get current user's shopping cart
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: List of cart items with item details
+    post:
+      summary: Add an item to cart
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId]
+              properties:
+                itemId: { type: string }
+                quantity: { type: integer, default: 1 }
+      responses:
+        200:
+          description: Added to cart
+    delete:
+      summary: Clear entire cart
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Cart cleared
+
+  /wishlist:
+    get:
+      summary: Get wishlist item IDs
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Array of item IDs
+    post:
+      summary: Toggle wishlist item
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId]
+              properties:
+                itemId: { type: string }
+      responses:
+        200:
+          description: Updated wishlist status
+
+  /orders:
+    post:
+      summary: Create an order and initiate payment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact, shippingAddress]
+              properties:
+                contact: { type: object }
+                shippingAddress: { type: object }
+      responses:
+        201:
+          description: Order created with payment details
+    get:
+      summary: List user's orders
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: User orders
+
+  /payments/verify:
+    post:
+      summary: Verify Khalti payment status by PIDX
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pidx]
+              properties:
+                pidx: { type: string }
+      responses:
+        200:
+          description: Payment verification status
+
+  /upload:
+    post:
+      summary: Upload an item image (max 10MB)
+      security:
+        - BearerAuth: []
+      responses:
+        201:
+          description: File URL
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
